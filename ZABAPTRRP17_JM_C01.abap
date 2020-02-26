@@ -12,7 +12,7 @@ CLASS lcl_controle DEFINITION.
 
     TYPES:
       BEGIN OF ty_s_saida,
-        cpf       TYPE zabaptrde15,
+        cpf       TYPE zabaptrde15_jm,
         nome      TYPE zabaptrde10_jm,
         datanasc  TYPE zabaptrde11_jm,
         sexo      TYPE zabaptrde16_jm,
@@ -86,17 +86,23 @@ CLASS lcl_controle IMPLEMENTATION.
           gs_zabaptrt08 TYPE zabaptrt08_jm,
           gs_zabaptrt09 TYPE zabaptrt09_jm.
 
+    SORT gt_zabaptrt09 BY codfilme.
 *   Loop na tabela principal (que contém a maioria dos dados)
     LOOP AT gt_zabaptrt09 INTO gs_zabaptrt09.
 
 *     Boa prática limpar a estrutura antes de dar READ TABLE
       CLEAR gs_zabaptrt07.
       READ TABLE gt_zabaptrt07 INTO gs_zabaptrt07 WITH KEY cpf = gs_zabaptrt09-cpf.
-      ms_saida-cpf      = gs_zabaptrt09-cpf.
+      ms_saida-cpf      = gs_zabaptrt09-cpf(3)   && '.' &&
+                          gs_zabaptrt09-cpf+3(3) && '.' &&
+                          gs_zabaptrt09-cpf+6(3) && '-' &&
+                          gs_zabaptrt09-cpf+9(2).
+
       ms_saida-nome     = gs_zabaptrt07-nome.
       ms_saida-datanasc = gs_zabaptrt07-dtnasc.
 
 *     Variável deve receber o valor a ser validado
+      CLEAR: mv_trim, mv_texto.
       mv_trim = gs_zabaptrt07-sexo.
 
       CALL FUNCTION 'DOMAIN_VALUE_GET'
