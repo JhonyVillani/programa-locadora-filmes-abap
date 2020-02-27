@@ -35,6 +35,9 @@ CLASS lcl_controle DEFINITION.
           mt_saida TYPE TABLE OF ty_s_saida,
           ms_saida TYPE ty_s_saida.
 
+*   Estrutura criada com os mesmos campos do TYPES
+    DATA: is_saida TYPE zabaptrs04_jm.
+
 *   Variáveis necessárias para chamar a função Domain Value Get
     DATA:
           mv_texto TYPE dd07v-ddtext, "Tipo do campo na função domain_value_get
@@ -87,6 +90,7 @@ CLASS lcl_controle IMPLEMENTATION.
           gs_zabaptrt09 TYPE zabaptrt09_jm.
 
     SORT gt_zabaptrt09 BY codfilme.
+
 *   Loop na tabela principal (que contém a maioria dos dados)
     LOOP AT gt_zabaptrt09 INTO gs_zabaptrt09.
 
@@ -141,6 +145,7 @@ CLASS lcl_controle IMPLEMENTATION.
       ms_saida-dtloc     = gs_zabaptrt09-dtloc.
       ms_saida-datadev   = gs_zabaptrt09-dtloc + 2.
 
+*     Verifica se a data de devolução antecede a data de hoje (expirou)
       IF ms_saida-datadev < sy-datum.
         ms_saida-atraso = 'Em atraso'.
       ENDIF.
@@ -153,21 +158,50 @@ CLASS lcl_controle IMPLEMENTATION.
 
   METHOD exibir.
 
+*   Verifica se o RADIO Smart foi selecionado
+    IF p_smart IS INITIAL. "Caso NÃO
 
-*       Criando o relatório ALV, declarando na classe a variáveis mo_alv referenciando cl_salv_table
-*       Chama o método que constrói a saída ALV
-    CALL METHOD cl_salv_table=>factory
-      IMPORTING
-        r_salv_table = mo_alv
-      CHANGING
-        t_table      = mt_saida.
+*     Criando o relatório ALV, declarando na classe a variáveis mo_alv referenciando cl_salv_table
+*     Chama o método que constrói a saída ALV
+      CALL METHOD cl_salv_table=>factory
+        IMPORTING
+          r_salv_table = mo_alv
+        CHANGING
+          t_table      = mt_saida.
 
-*       Mostra o ALV
-    mo_alv->display( ). "Imprime na tela do relatório ALV
+*     Mostra o ALV
+      mo_alv->display( ). "Imprime na tela do relatório ALV
 
 *   Otimiza tamanho das colunas
-    go_columns = mo_alv->get_columns( ). "Retorna o objeto tipo coluna INSTANCIADO
-    go_columns->set_optimize( ).
+      go_columns = mo_alv->get_columns( ). "Retorna o objeto tipo coluna INSTANCIADO
+      go_columns->set_optimize( ).
+
+    ELSE. "Caso SIM
+
+*     Variável do tipo fm_name necessária para importar as informações
+      DATA: fm_name TYPE rs38l_fnam.
+
+      READ TABLE mt_saida INTO is_saida INDEX 1.
+
+*     Função que passa uma estrutura para o Smartform e exibe-o (Necessário método de importação FM_NAME)
+      CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+        EXPORTING
+          formname           = 'ZABAPTRSF01_JM'
+*         VARIANT            = ' '
+          direct_call        = 'X'
+        IMPORTING
+          fm_name            = fm_name "Função definida abaixo
+        EXCEPTIONS
+          no_form            = 1
+          no_function_module = 2
+          OTHERS             = 3.
+
+*     Função que importa a estrutura do programa para dentro do Smartform (Necessária para o primeiro método funcionar
+      CALL FUNCTION fm_name
+        EXPORTING
+          is_saida = is_saida. "No smartform é necessário ter a variável is_saida declarada em ls_saida
+
+    ENDIF.
 
   ENDMETHOD.                    "exibir
 
