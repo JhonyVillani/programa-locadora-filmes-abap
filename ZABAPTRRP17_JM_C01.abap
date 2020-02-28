@@ -35,9 +35,6 @@ CLASS lcl_controle DEFINITION.
           mt_saida TYPE TABLE OF ty_s_saida,
           ms_saida TYPE ty_s_saida.
 
-*   Estrutura criada com os mesmos campos do TYPES
-    DATA: is_saida TYPE zabaptrs04_jm.
-
 *   Variáveis necessárias para chamar a função Domain Value Get
     DATA:
           mv_texto TYPE dd07v-ddtext, "Tipo do campo na função domain_value_get
@@ -178,28 +175,75 @@ CLASS lcl_controle IMPLEMENTATION.
 
     ELSE. "Caso SIM
 
-*     Variável do tipo fm_name necessária para importar as informações
-      DATA: fm_name TYPE rs38l_fnam.
+*     Declarações do Smartform
+      DATA:
+            lv_fm_name            TYPE rs38l_fnam,
+            ls_control_parameters TYPE ssfctrlop,
+            ls_output_options     TYPE ssfcompop,
+            ls_job_output_info    TYPE ssfcrescl,
+            ls_saida              TYPE zabaptrs04_jm. "Do tipo da estrutura SE11 criada para exibição
 
-      READ TABLE mt_saida INTO is_saida INDEX 1.
+      LOOP AT mt_saida INTO ls_saida.
 
-*     Função que passa uma estrutura para o Smartform e exibe-o (Necessário método de importação FM_NAME)
-      CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
-        EXPORTING
-          formname           = 'ZABAPTRSF01_JM'
-*         VARIANT            = ' '
-          direct_call        = 'X'
-        IMPORTING
-          fm_name            = fm_name "Função definida abaixo
-        EXCEPTIONS
-          no_form            = 1
-          no_function_module = 2
-          OTHERS             = 3.
+*       Declarações de variáveis a serem utilizadas no Case que verifica a quantidade de páginas via LOOP
+        DATA: lv_lines TYPE i,
+              lv_tabix TYPE sy-tabix.
+        lv_tabix = sy-tabix.
 
-*     Função que importa a estrutura do programa para dentro do Smartform (Necessária para o primeiro método funcionar
-      CALL FUNCTION fm_name
-        EXPORTING
-          is_saida = is_saida. "No smartform é necessário ter a variável is_saida declarada em ls_saida
+*       Função que passa uma estrutura para o Smartform e exibe-o (Necessário método de importação FM_NAME)
+        CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+          EXPORTING
+            formname           = 'ZABAPTRSF01_JM'
+          IMPORTING
+            fm_name            = lv_fm_name "Função definida abaixo
+          EXCEPTIONS
+            no_form            = 1
+            no_function_module = 2
+            OTHERS             = 3.
+
+*       Definições de saída do Smartform
+        ls_output_options-tddest        = 'LP01'.
+        ls_output_options-tdimmed       = abap_true.
+        ls_control_parameters-no_dialog = abap_true.
+        ls_control_parameters-preview   = abap_true.
+
+*       Case para verificar quantidade de páginas a serem exibidas pelo LOOP
+        DESCRIBE TABLE mt_saida LINES lv_lines.
+
+        CASE lv_tabix.
+          WHEN 1.
+            ls_control_parameters-no_open = abap_false.
+            ls_control_parameters-no_close = abap_true.
+          WHEN OTHERS.
+            ls_control_parameters-no_open = abap_true.
+            ls_control_parameters-no_close = abap_true.
+        ENDCASE.
+
+        IF lv_lines EQ 1.
+          ls_control_parameters-no_open = abap_false.
+          ls_control_parameters-no_close = abap_false.
+        ELSEIF sy-tabix EQ lv_lines.
+          ls_control_parameters-no_open = abap_true.
+          ls_control_parameters-no_close = abap_false.
+        ENDIF.
+
+*       Função que importa a estrutura do programa para dentro do Smartform (Necessária para o primeiro método funcionar
+        CALL FUNCTION lv_fm_name
+          EXPORTING
+            control_parameters = ls_control_parameters
+            output_options     = ls_output_options
+            user_settings      = space
+            is_saida           = ls_saida "No Smartform é necessário ter a variável job declarada com o mesmo tipo da estrutura global
+          IMPORTING
+            job_output_info    = ls_job_output_info
+          EXCEPTIONS
+            formatting_error   = 1
+            internal_error     = 2
+            send_error         = 3
+            user_canceled      = 4
+            OTHERS             = 5.
+
+      ENDLOOP.
 
     ENDIF.
 
